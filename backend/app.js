@@ -2,6 +2,9 @@ const express = require("express");
 const port=process.env.PORT || 4255;
 const app = express()
 app.use(express.json())
+const userRoutes = require('./routes/user');
+app.use('/api', userRoutes);
+
 
 const db = require('./db')
 
