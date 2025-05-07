@@ -2,7 +2,8 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/user'); // Adjust path if needed
 const mongoose = require('mongoose');
-
+const { validationResult } = require('express-validator');
+const validateUserUpdate=require('../middleware/validateUserUpdate')
 // POST /api/signup
 router.post('/signup', async (req, res) => {
   try {
@@ -100,7 +101,6 @@ router.get('/:id', async (req, res) => {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
-
 
 
 module.exports = router;
