@@ -103,4 +103,23 @@ router.get('/:id', async (req, res) => {
 });
 
 
+router.put('/users/:id', validateUserUpdate, async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    Object.assign(user, req.body);
+    await user.save();
+
+    res.json({ message: 'User updated successfully', user });
+  } catch (err) {
+    console.error('Error updating user:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+})
 module.exports = router;
