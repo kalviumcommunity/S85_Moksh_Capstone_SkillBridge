@@ -27,6 +27,7 @@ import {
   EyeOff,
 } from "lucide-react"
 import api from "../utils/api"
+import { CLOUDINARY_UPLOAD_URL, CLOUDINARY_UPLOAD_PRESET, getApiBaseUrl } from "../config/constants"
 import Messages from "./Messages"
 import Notifications from "./Notifications"
 import Connections from "./Connections"
@@ -427,9 +428,9 @@ export default function HomePage() {
       // Upload to Cloudinary
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("upload_preset", "Skill Bridge");
+      formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
       const uploadRes = await axios.post(
-        "https://api.cloudinary.com/v1_1/dxp6ok4wo/image/upload",
+        CLOUDINARY_UPLOAD_URL,
         formData
       );
       const imageUrl = uploadRes.data.secure_url;
@@ -793,7 +794,7 @@ export default function HomePage() {
                       <div className="relative group">
                         <img
                           src={
-                            post.imageUrl?.startsWith("http") ? post.imageUrl : `${import.meta.env.VITE_API_URL}${post.imageUrl}`
+                            post.imageUrl?.startsWith("http") ? post.imageUrl : `${getApiBaseUrl()}${post.imageUrl}`
                           }
                           alt={post.caption || "Post image"}
                           className="w-full h-auto object-cover group-hover:scale-[1.01] transition-transform duration-700"
