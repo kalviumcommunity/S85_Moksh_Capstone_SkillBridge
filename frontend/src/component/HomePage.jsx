@@ -68,7 +68,6 @@ export default function HomePage() {
   const [selectedUserId, setSelectedUserId] = useState(null)
 
   // New state for messages
-  const [showMessages, setShowMessages] = useState(false)
   const [selectedConversation, setSelectedConversation] = useState(null)
 
   // New state for conversations
@@ -134,6 +133,16 @@ export default function HomePage() {
         commentsData[post._id] = post.comments || []
       })
       setPostComments(commentsData)
+
+      // Load bookmarked posts to sync state
+      try {
+        const bookmarksResponse = await api.get("/api/posts/bookmarks")
+        const bookmarkedIds = new Set(bookmarksResponse.data?.map(post => post._id) || [])
+        setBookmarkedPosts(bookmarkedIds)
+      } catch (bookmarkError) {
+        console.error("Error loading bookmarks:", bookmarkError)
+        // Keep existing bookmark state if API fails
+      }
     } catch (error) {
       console.error("Error loading posts:", error)
       setPosts([]) // Set empty array if API fails
@@ -149,6 +158,9 @@ export default function HomePage() {
         setUserName(payload.name || payload.username || "User")
       } catch (error) {
         console.error("Error decoding token:", error)
+        // If token is invalid, redirect to login
+        localStorage.removeItem("token")
+        navigate("/login")
       }
     }
   }
@@ -190,8 +202,6 @@ export default function HomePage() {
     formData.append("caption", caption)
     formData.append("anonymous", postAnonymously)
 
-    const token = localStorage.getItem("token")
-
     try {
       await api.post(`/api/posts`, formData, {
         headers: {
@@ -213,7 +223,6 @@ export default function HomePage() {
   // Handle post interactions
   const handleLike = async (postId) => {
     try {
-      const token = localStorage.getItem("token")
       await api.post(`/api/posts/${postId}/like`, {})
       loadPosts() // Refresh posts to show updated likes
     } catch (error) {
@@ -223,7 +232,6 @@ export default function HomePage() {
 
   const handleBookmark = async (postId) => {
     try {
-      const token = localStorage.getItem("token")
       await api.post(`/api/posts/${postId}/bookmark`, {})
 
       // Toggle bookmark state locally
@@ -279,17 +287,19 @@ export default function HomePage() {
     try {
       const response = await api.post(`/api/posts/${postId}/comment`, { text: commentText })
 
-      // Update local comments state
+      // Update local comments state with server response
       const newComments = { ...postComments }
       if (!newComments[postId]) {
         newComments[postId] = []
       }
-      newComments[postId].push({
+      // Use the comment from server response if available, otherwise create local one
+      const newComment = response.data || {
         _id: Date.now().toString(),
         text: commentText,
         author: { name: userName },
         createdAt: new Date().toISOString(),
-      })
+      }
+      newComments[postId].push(newComment)
       setPostComments(newComments)
 
       // Clear comment input
@@ -349,7 +359,7 @@ export default function HomePage() {
     loadNotifications()
     const interval = setInterval(loadNotifications, 30000)
     return () => clearInterval(interval)
-  }, [])
+  }, []) // loadNotifications is stable, no need to add to deps
 
   const socket = useSocket()
   useEffect(() => {
@@ -360,7 +370,7 @@ export default function HomePage() {
     return () => {
       socket.off("notification")
     }
-  }, [socket])
+  }, [socket]) // socket dependency is correct
 
   // Fetch user and connections on mount
   useEffect(() => {
@@ -783,10 +793,13 @@ export default function HomePage() {
                       <div className="relative group">
                         <img
                           src={
-                            post.imageUrl.startsWith("http") ? post.imageUrl : `${import.meta.env.VITE_API_URL}${post.imageUrl}`
+                            post.imageUrl?.startsWith("http") ? post.imageUrl : `${import.meta.env.VITE_API_URL}${post.imageUrl}`
                           }
                           alt={post.caption || "Post image"}
                           className="w-full h-auto object-cover group-hover:scale-[1.01] transition-transform duration-700"
+                          onError={(e) => {
+                            e.target.style.display = 'none'
+                          }}
                         />
                       </div>
 
@@ -881,9 +894,9 @@ export default function HomePage() {
                                       <div className="flex items-center space-x-2 mb-1">
                                         <span
                                           className="text-sm font-medium text-white cursor-pointer hover:text-blue-300 transition-colors"
-                                          onClick={() => handleUserClick(comment.author?._id)}
+                                          onClick={() => handleUserClick(comment.author?._id || comment.author)}
                                         >
-                                          {comment.author?.name || userName}
+                                          {comment.author?.name || comment.author || userName}
                                         </span>
                                         <span className="text-xs text-slate-400">
                                           {new Date(comment.createdAt).toLocaleDateString()}

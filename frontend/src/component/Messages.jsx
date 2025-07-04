@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { X, Search, Send, MessageCircle } from "lucide-react"
-import axios from "axios"
+import api from "../utils/api"
 import { useSocket } from '../SocketContext'
 
 export default function Messages({ onClose, reloadConversations, conversations }) {
@@ -153,10 +153,7 @@ export default function Messages({ onClose, reloadConversations, conversations }
 
   const loadConversations = async () => {
     try {
-      const token = localStorage.getItem("token")
-      const response = await axios.get("/api/messages/conversations", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const response = await api.get("/api/messages/conversations")
     } catch (error) {
       console.error("Error loading conversations:", error)
     } finally {
@@ -184,9 +181,7 @@ const loadMessages = async (id, beforeId = null, append = false) => {
       url += `?before=${beforeId}`;
     }
 
-    const response = await axios.get(url, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const response = await api.get(url);
 
     const newMessages = response.data || [];
     if (append) {
@@ -221,11 +216,7 @@ const loadMessages = async (id, beforeId = null, append = false) => {
         alert("Please select a user to chat with.")
         return
       }
-      const response = await axios.post(
-        "/api/messages",
-        payload,
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
+      const response = await api.post("/api/messages", payload)
       setMessages([...messages, response.data])
       setNewMessage("")
       // Emit via Socket.IO for live update
@@ -236,9 +227,7 @@ const loadMessages = async (id, beforeId = null, append = false) => {
       if (!selectedConv && selectedUser) {
         await loadConversations()
         const token = localStorage.getItem("token")
-        const updatedConvs = await axios.get("/api/messages/conversations", {
-          headers: { Authorization: `Bearer ${token}` },
-        })
+        const updatedConvs = await api.get("/api/messages/conversations")
         const newConv = updatedConvs.data.find(conv =>
           conv.otherParticipant && conv.otherParticipant._id === selectedUser._id
         )
@@ -286,11 +275,7 @@ const loadMessages = async (id, beforeId = null, append = false) => {
       try {
         const token = localStorage.getItem("token");
         // Create conversation by sending a blank message (not ideal, but works for now)
-        const response = await axios.post(
-          "/api/messages",
-          { receiverId: selectedUser._id, content: "" },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        const response = await api.post("/api/messages", { receiverId: selectedUser._id, content: "" });
         // Reload conversations
         await loadConversations();
         // Find the new conversation
