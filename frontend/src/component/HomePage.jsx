@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
+import axios from "axios"
 import {
   Search,
   Bell,
@@ -276,14 +277,7 @@ export default function HomePage() {
     if (!commentText || !commentText.trim()) return
 
     try {
-      const token = localStorage.getItem("token")
-      const response = await axios.post(
-        `/api/posts/${postId}/comment`,
-        { text: commentText },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      )
+      const response = await api.post(`/api/posts/${postId}/comment`, { text: commentText })
 
       // Update local comments state
       const newComments = { ...postComments }
@@ -342,14 +336,9 @@ export default function HomePage() {
     setRightPanel("messages") // <-- This opens the right panel!
   }
 
-  const unreadMessages = conversations.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0)
-
   const loadNotifications = async () => {
     try {
-      const token = localStorage.getItem("token")
-      const response = await axios.get("/api/notifications", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const response = await api.get("/api/notifications")
       setNotifications(response.data || [])
     } catch (error) {
       setNotifications([])
@@ -373,16 +362,11 @@ export default function HomePage() {
     }
   }, [socket])
 
-  const unreadNotifications = notifications.filter(n => !n.read).length
-
   // Fetch user and connections on mount
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const token = localStorage.getItem("token");
-        const res = await axios.get("/api/users/me", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await api.get("/api/users/me");
         setUser(res.data);
       } catch (err) {
         setUser(null);
@@ -390,10 +374,7 @@ export default function HomePage() {
     };
     const fetchConnections = async () => {
       try {
-        const token = localStorage.getItem("token");
-        const res = await axios.get("/api/connections", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await api.get("/api/connections");
         setConnections(res.data || []);
       } catch (err) {
         setConnections([]);
@@ -406,10 +387,7 @@ export default function HomePage() {
   // Handler for updating profile
   const handleProfileUpdate = async (data) => {
     try {
-      const token = localStorage.getItem("token");
-      const res = await axios.put(`/api/users/${userId}/profile`, data, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await api.put(`/api/users/${userId}/profile`, data);
       setUser(res.data);
     } catch (err) {
       console.error("Error updating profile:", err);
@@ -459,10 +437,7 @@ export default function HomePage() {
   // Handler for removing a connection
   const handleRemoveConnection = async (connectionId) => {
     try {
-      const token = localStorage.getItem("token");
-      await axios.delete(`/api/connections/${connectionId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await api.delete(`/api/connections/${connectionId}`);
       setConnections(connections.filter((c) => c._id !== connectionId));
     } catch (err) {
       console.error("Error removing connection:", err);
@@ -477,6 +452,10 @@ export default function HomePage() {
     window.addEventListener("authError", handleAuthError);
     return () => window.removeEventListener("authError", handleAuthError);
   }, []);
+
+  // Calculate unread counts
+  const unreadMessages = conversations.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0)
+  const unreadNotifications = notifications.filter(n => !n.read).length
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 relative overflow-hidden">
@@ -745,10 +724,7 @@ export default function HomePage() {
                                 </button>
                                 <button
                                   onClick={async () => {
-                                    const token = localStorage.getItem("token")
-                                    await axios.delete(`/api/posts/${post._id}`, {
-                                      headers: { Authorization: `Bearer ${token}` },
-                                    })
+                                    await api.delete(`/api/posts/${post._id}`)
                                     loadPosts()
                                     setMenuOpen(null)
                                   }}
@@ -776,15 +752,8 @@ export default function HomePage() {
                             <button
                               className="px-4 py-1 bg-blue-600 text-white rounded"
                               onClick={async () => {
-                                const token = localStorage.getItem("token")
                                 try {
-                                  await axios.put(
-                                    `/api/posts/${post._id}`,
-                                    { caption: editingCaption },
-                                    {
-                                      headers: { Authorization: `Bearer ${token}` },
-                                    },
-                                  )
+                                  await api.put(`/api/posts/${post._id}`, { caption: editingCaption })
                                   setEditingCaptionId(null)
                                   loadPosts()
                                 } catch (err) {
