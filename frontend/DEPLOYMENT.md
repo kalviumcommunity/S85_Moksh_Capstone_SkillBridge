@@ -39,11 +39,15 @@ netlify login
 netlify init
 ```
 
-### 3. Configure Environment Variables
+### 3. Configure Environment Variables (Optional)
+The application now uses centralized configuration, but you can still set environment variables if needed:
+
 1. In your Netlify dashboard, go to Site settings > Environment variables
-2. Add the following environment variable:
+2. Add the following environment variable (optional):
    - **Key**: `VITE_API_URL`
    - **Value**: `https://s85-moksh-capstone-skillbridge.onrender.com`
+
+**Note**: The application automatically detects the environment and uses the correct URL from `src/config/constants.js`
 
 ### 4. Backend Environment Variables (Render)
 In your Render backend service dashboard:
@@ -76,8 +80,9 @@ After setting environment variables, trigger a new deployment:
 ### Environment Variables:
 
 **Frontend (Netlify):**
-- `VITE_API_URL`: `https://s85-moksh-capstone-skillbridge.onrender.com`
+- `VITE_API_URL`: `https://s85-moksh-capstone-skillbridge.onrender.com` (optional - uses centralized config)
 - Make sure to use `https://` not `http://` for production
+- **New**: Configuration is centralized in `src/config/constants.js`
 
 **Backend (Render):**
 - `DB_URI`: `mongodb+srv://vsmokshsharma688:skillbridge123@skillbridge.2b1itpi.mongodb.net/skillbridge?retryWrites=true&w=majority`
