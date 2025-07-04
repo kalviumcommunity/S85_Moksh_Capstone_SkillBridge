@@ -10,7 +10,12 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: true
+    required: function() {
+      return !this.googleId; // Password is required if not using Google login
+    }
+  },
+  googleId: {
+    type: String
   },
   role: {
     type: String,
@@ -21,6 +26,12 @@ const userSchema = new mongoose.Schema({
   name: {
     type: String,
     trim: true
+  },
+  username: {
+    type: String,
+    trim: true,
+    unique: true,
+    sparse: true // allows null for users who don't set it
   },
   skills: {
     type: [String], // array of skills
@@ -50,7 +61,22 @@ const userSchema = new mongoose.Schema({
   bountyEarned: {
     type: Number,
     default: 0 // For students only
-  }
+  },
+  avatarUrl: {
+    type: String
+  },
+  isOnline: {
+    type: Boolean,
+    default: false
+  },
+  lastSeen: {
+    type: Date
+  },
+  connections: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: []
+  }]
 }, { timestamps: true });
 
 const User = mongoose.model('User', userSchema);
