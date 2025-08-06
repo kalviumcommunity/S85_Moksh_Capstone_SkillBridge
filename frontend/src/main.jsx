@@ -18,8 +18,11 @@ axios.interceptors.response.use(
   }
 );
 
+// Get Google Client ID from environment or use default
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '196564239232-f94gsenprde6m8csolnnsr4o0kf38sjt.apps.googleusercontent.com';
+
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <GoogleOAuthProvider clientId="196564239232-f94gsenprde6m8csolnnsr4o0kf38sjt.apps.googleusercontent.com">
+  <GoogleOAuthProvider clientId={googleClientId}>
     <App />
   </GoogleOAuthProvider>
 );

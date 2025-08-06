@@ -6,8 +6,8 @@ const { validationResult } = require('express-validator');
 const { OAuth2Client } = require('google-auth-library');
 const bcrypt = require('bcryptjs');
 
-const JWT_SECRET = 'ASDFGHJKL'; // Use env in production
-const CLIENT_ID = '196564239232-f94gsenprde6m8csolnnsr4o0kf38sjt.apps.googleusercontent.com'
+const JWT_SECRET = process.env.JWT_SECRET || 'ASDFGHJKL'; // Use env in production
+const CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '196564239232-f94gsenprde6m8csolnnsr4o0kf38sjt.apps.googleusercontent.com'
 // Replace with your actual client ID
 
 // Utility function

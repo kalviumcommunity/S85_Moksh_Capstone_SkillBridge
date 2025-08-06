@@ -19,7 +19,10 @@ const io = socketIo(server, {
 
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || "http://localhost:5173",
+  origin: [
+    'http://localhost:5173',
+    'https://skillbridgeweb.netlify.app'
+  ],
   credentials: true
 }));
 app.use(express.json());
@@ -82,6 +85,7 @@ app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/connections', require('./routes/connectionRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/conversations', require('./routes/conversationRoutes'));
+app.use('/api/hashtags', require('./routes/hashtagRoutes'));
 
 // Start server after DB connects
 const PORT = process.env.PORT || 5000;
