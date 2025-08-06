@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { User } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export default function ProfileModal({ user, connections, onClose, onProfileUpdate, onProfilePictureUpload, onRemoveConnection, uploadError }) {
   const [editMode, setEditMode] = useState(false);
@@ -10,6 +11,8 @@ export default function ProfileModal({ user, connections, onClose, onProfileUpda
   const [preview, setPreview] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+
+  const navigate = useNavigate(); // For redirecting after logout
 
   const handleProfileUpdate = async (e) => {
     e.preventDefault();
@@ -41,6 +44,21 @@ export default function ProfileModal({ user, connections, onClose, onProfileUpda
     } finally {
       setUploading(false);
     }
+  };
+
+  // Handler for logging out the user
+  const handleLogout = async () => {
+    try {
+      // Optionally notify the backend (stateless logout)
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch {
+      // Ignore errors, just proceed to logout on client
+    }
+    // Remove the token from localStorage
+    localStorage.removeItem('token');
+    // Optionally, clear any other user data here
+    // Redirect to login page
+    navigate('/login');
   };
 
   return (
@@ -95,7 +113,7 @@ export default function ProfileModal({ user, connections, onClose, onProfileUpda
         <div className="mt-6 border-t border-slate-700 pt-4">
           <h4 className="text-slate-400 text-xs mb-2">Settings</h4>
           <button className="w-full py-2 bg-slate-800 text-white rounded-lg mb-2">Change Password</button>
-          <button className="w-full py-2 bg-slate-800 text-white rounded-lg">Logout</button>
+          <button className="w-full py-2 bg-slate-800 text-white rounded-lg" onClick={handleLogout}>Logout</button>
         </div>
       </div>
       {/* Profile Picture Edit Modal */}

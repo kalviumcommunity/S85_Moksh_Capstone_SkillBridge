@@ -1,5 +1,6 @@
 const Post = require('../models/post');
 const { createNotification } = require('./notificationController');
+const Hashtag = require('../models/hashtag');
 
 // @desc Fetch feed
 // @route GET /api/posts
@@ -154,5 +155,54 @@ exports.editPost = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.getBookmarkedPosts = async (req, res) => {
+  // Placeholder: return empty array
+  res.json([]);
+};
+
+/**
+ * Get Trending Posts
+ * This function returns the top 10 posts for the Explore page.
+ * Trending is determined by sorting posts by number of likes, then views, then most recent.
+ * The author information is included for each post.
+ * This endpoint is public and does not require authentication.
+ */
+exports.getTrendingPosts = async (req, res) => {
+  try {
+    console.log('DEBUG: getTrendingPosts called');
+    // Find all posts, sort by likes (descending), then views (descending), then most recent
+    const posts = await Post.find()
+      .sort({ likes: -1, views: -1, createdAt: -1 })
+      .limit(10)
+      .populate('author', 'name username avatarUrl');
+    console.log('DEBUG: getTrendingPosts result count:', posts.length);
+    res.json(posts);
+  } catch (err) {
+    console.error('ERROR in getTrendingPosts:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+/**
+ * Get Trending Hashtags
+ * This function returns the top 10 hashtags for the Explore page.
+ * Trending hashtags are determined by their usage count (most used first).
+ * This endpoint is public and does not require authentication.
+ */
+exports.getTrendingHashtags = async (req, res) => {
+  try {
+    console.log('DEBUG: getTrendingHashtags called');
+    // Find all hashtags, sort by count (descending)
+    const hashtags = await Hashtag.find()
+      .sort({ count: -1 })
+      .limit(10);
+    console.log('DEBUG: getTrendingHashtags result count:', hashtags.length);
+    res.json(hashtags);
+  } catch (err) {
+    console.error('ERROR in getTrendingHashtags:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
   }
 };

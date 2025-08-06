@@ -19,6 +19,12 @@ router.post('/google-login', googleLogin);
 // ✅ POST /api/login (Gmail + Password login)
 router.post('/login', login);
 
+// POST /api/logout (stateless, for frontend compatibility)
+router.post('/logout', (req, res) => {
+  // On the backend, just respond OK. Client should remove token.
+  res.json({ message: 'Logged out successfully.' });
+});
+
 // (Optional) Uncomment these if needed
 router.get('/', getAllUsers);
 router.get('/:id', getUserById);
