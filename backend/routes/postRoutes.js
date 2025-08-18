@@ -9,7 +9,9 @@ const {
   likePost,
   bookmarkPost,
   deletePost,
-  editPost // <-- Import the editPost controller
+  editPost,
+  getTrendingPosts,
+  getBookmarkedPosts
 } = require('../controllers/postController');
 
 // Multer configuration
@@ -23,6 +25,12 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage });
+
+// @route GET /api/posts/trending (must be before dynamic routes)
+router.get('/trending', getTrendingPosts);
+
+// @route GET /api/posts/bookmarks
+router.get('/bookmarks', auth, getBookmarkedPosts);
 
 // @route GET /api/posts
 router.get('/', getAllPosts);

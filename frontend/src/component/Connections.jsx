@@ -147,17 +147,17 @@ export default function Connections({ onClose, onOpenMessages }) {
     let data = []
     switch (activeTab) {
       case "connections":
-        data = connections.map(item => ({
+        data = Array.isArray(connections) ? connections.map(item => ({
           ...item.user, // flatten user fields to top-level for connections
           _id: item._id,
           connectedAt: item.connectedAt,
-        }))
+        })) : []
         break
       case "requests":
-        data = connectionRequests
+        data = Array.isArray(connectionRequests) ? connectionRequests : []
         break
       case "discover":
-        data = discoverUsers
+        data = Array.isArray(discoverUsers) ? discoverUsers : []
         break
       default:
         data = []

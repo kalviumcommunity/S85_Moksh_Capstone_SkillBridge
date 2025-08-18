@@ -138,11 +138,12 @@ export default function HomePage() {
       // Load bookmarked posts to sync state
       try {
         const bookmarksResponse = await api.get("/api/posts/bookmarks")
-        const bookmarkedIds = new Set(bookmarksResponse.data?.map(post => post._id) || [])
+        const bookmarksData = Array.isArray(bookmarksResponse.data) ? bookmarksResponse.data : []
+        const bookmarkedIds = new Set(bookmarksData.map(post => post._id) || [])
         setBookmarkedPosts(bookmarkedIds)
       } catch (bookmarkError) {
         console.error("Error loading bookmarks:", bookmarkError)
-        // Keep existing bookmark state if API fails
+        setBookmarkedPosts(new Set()) // Set empty set if API fails
       }
     } catch (error) {
       console.error("Error loading posts:", error)
@@ -679,7 +680,7 @@ export default function HomePage() {
                   </button>
                 </div>
               ) : (
-                posts.map((post) => {
+                Array.isArray(posts) ? posts.map((post) => {
                   const isLiked = post.likedBy?.includes(userId)
                   const isBookmarked = bookmarkedPosts.has(post._id)
                   const isCommentsOpen = openComments.has(post._id)
@@ -914,7 +915,7 @@ export default function HomePage() {
                       </div>
                     </article>
                   )
-                })
+                }) : []
               )}
             </div>
           </div>

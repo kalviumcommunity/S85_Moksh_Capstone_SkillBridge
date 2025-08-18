@@ -58,13 +58,13 @@ export default function Explore({ onClose }) {
     let data = []
     switch (activeTab) {
       case "trending":
-        data = trendingPosts
+        data = Array.isArray(trendingPosts) ? trendingPosts : []
         break
       case "hashtags":
-        data = trendingHashtags
+        data = Array.isArray(trendingHashtags) ? trendingHashtags : []
         break
       case "people":
-        data = suggestedPeople
+        data = Array.isArray(suggestedPeople) ? suggestedPeople : []
         break
       default:
         data = []
