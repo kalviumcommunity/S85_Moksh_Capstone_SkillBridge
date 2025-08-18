@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { X, Search, TrendingUp, Hash, Users, Eye } from "lucide-react"
-import axios from "axios"
+import api from "../utils/api"
 
 export default function Explore({ onClose }) {
   const [activeTab, setActiveTab] = useState("trending") // trending, hashtags, people
@@ -19,22 +19,14 @@ export default function Explore({ onClose }) {
   const loadExploreData = async () => {
     setLoading(true)
     try {
-      const token = localStorage.getItem("token")
-
       if (activeTab === "trending") {
-        const response = await axios.get("/api/posts/trending", {
-          headers: { Authorization: `Bearer ${token}` },
-        })
+        const response = await api.get("/api/posts/trending")
         setTrendingPosts(response.data || [])
       } else if (activeTab === "hashtags") {
-        const response = await axios.get("/api/hashtags/trending", {
-          headers: { Authorization: `Bearer ${token}` },
-        })
+        const response = await api.get("/api/hashtags/trending")
         setTrendingHashtags(response.data || [])
       } else if (activeTab === "people") {
-        const response = await axios.get("/api/users/suggested", {
-          headers: { Authorization: `Bearer ${token}` },
-        })
+        const response = await api.get("/api/users/suggested")
         setSuggestedPeople(response.data || [])
       }
     } catch (error) {
@@ -46,14 +38,7 @@ export default function Explore({ onClose }) {
 
   const followHashtag = async (hashtag) => {
     try {
-      const token = localStorage.getItem("token")
-      await axios.post(
-        "/api/hashtags/follow",
-        { hashtag },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      )
+      await api.post("/api/hashtags/follow", { hashtag })
       loadExploreData()
     } catch (error) {
       console.error("Error following hashtag:", error)
@@ -62,14 +47,7 @@ export default function Explore({ onClose }) {
 
   const followUser = async (userId) => {
     try {
-      const token = localStorage.getItem("token")
-      await axios.post(
-        "/api/users/follow",
-        { userId },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      )
+      await api.post("/api/users/follow", { userId })
       loadExploreData()
     } catch (error) {
       console.error("Error following user:", error)
