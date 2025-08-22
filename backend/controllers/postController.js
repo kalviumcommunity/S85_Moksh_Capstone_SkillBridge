@@ -35,6 +35,9 @@ exports.createPost = async (req, res) => {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
+    console.log('Creating post with file:', req.file);
+    console.log('Request body:', req.body);
+
     const imageUrl = req.file ? req.file.path : '';
     const post = await Post.create({
       author: req.user._id,
@@ -46,8 +49,8 @@ exports.createPost = async (req, res) => {
     await post.populate('author', 'name avatarUrl');
     res.status(201).json(post);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Failed to create post' });
+    console.error('Error creating post:', err);
+    res.status(500).json({ message: 'Failed to create post', error: err.message });
   }
 };
 
