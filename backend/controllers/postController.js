@@ -35,7 +35,7 @@ exports.createPost = async (req, res) => {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    const imageUrl = req.file ? `/uploads/${req.file.filename}` : '';
+    const imageUrl = req.file ? req.file.path : '';
     const post = await Post.create({
       author: req.user._id,
       imageUrl,

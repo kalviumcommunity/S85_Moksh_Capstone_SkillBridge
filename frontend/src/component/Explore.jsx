@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 "use client"
 
 import { useState, useEffect } from "react"
@@ -58,13 +59,13 @@ export default function Explore({ onClose }) {
     let data = []
     switch (activeTab) {
       case "trending":
-        data = Array.isArray(trendingPosts) ? trendingPosts : []
+        data = trendingPosts
         break
       case "hashtags":
-        data = Array.isArray(trendingHashtags) ? trendingHashtags : []
+        data = trendingHashtags
         break
       case "people":
-        data = Array.isArray(suggestedPeople) ? suggestedPeople : []
+        data = suggestedPeople
         break
       default:
         data = []
