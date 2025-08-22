@@ -38,7 +38,19 @@ exports.createPost = async (req, res) => {
     console.log('Creating post with file:', req.file);
     console.log('Request body:', req.body);
 
-    const imageUrl = req.file ? req.file.path : '';
+    let imageUrl = '';
+    if (req.file) {
+      // If using Cloudinary, req.file.path will be the Cloudinary URL
+      // If using memory storage, we need to handle it differently
+      if (req.file.path) {
+        imageUrl = req.file.path;
+      } else if (req.file.buffer) {
+        // For memory storage, we'll store as base64 temporarily
+        imageUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+        console.log('Using memory storage fallback');
+      }
+    }
+
     const post = await Post.create({
       author: req.user._id,
       imageUrl,
