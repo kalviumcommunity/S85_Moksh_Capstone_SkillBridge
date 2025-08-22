@@ -1,8 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const multer = require('multer');
-const path = require('path');
 const auth = require('../middleware/auth');
+const upload = require('../utils/multer'); // Use Cloudinary-enabled multer
 const {
   getAllPosts,
   createPost,
@@ -13,18 +12,6 @@ const {
   getTrendingPosts,
   getBookmarkedPosts
 } = require('../controllers/postController');
-
-// Multer configuration
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/');
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
-  }
-});
-
-const upload = multer({ storage });
 
 // @route GET /api/posts/trending (must be before dynamic routes)
 router.get('/trending', getTrendingPosts);

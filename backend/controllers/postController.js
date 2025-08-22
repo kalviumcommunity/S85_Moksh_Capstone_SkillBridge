@@ -35,21 +35,10 @@ exports.createPost = async (req, res) => {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    console.log('Creating post with file:', req.file);
-    console.log('Request body:', req.body);
+    console.log('DEBUG file:', req.file);
+    console.log('DEBUG body:', req.body);
 
-    let imageUrl = '';
-    if (req.file) {
-      // If using Cloudinary, req.file.path will be the Cloudinary URL
-      // If using memory storage, we need to handle it differently
-      if (req.file.path) {
-        imageUrl = req.file.path;
-      } else if (req.file.buffer) {
-        // For memory storage, we'll store as base64 temporarily
-        imageUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
-        console.log('Using memory storage fallback');
-      }
-    }
+    const imageUrl = req.file ? req.file.path : null; // ✅ Cloudinary URL or null
 
     const post = await Post.create({
       author: req.user._id,
@@ -65,6 +54,7 @@ exports.createPost = async (req, res) => {
     res.status(500).json({ message: 'Failed to create post', error: err.message });
   }
 };
+
 
 // @desc Like/Unlike a post
 // @route POST /api/posts/:id/like
