@@ -4,27 +4,27 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import axios from "axios"
-import {
-  Search,
-  Bell,
-  MessageCircle,
-  Users,
-  User,
-  Plus,
-  MoreHorizontal,
-  HeartIcon as HeartOutline,
-  HeartIcon as HeartFilled,
-  Bookmark,
-  Trash2,
-  Edit3,
-  Home,
-  Compass,
+import { 
+  Heart, 
+  MessageCircle, 
+  Send, 
+  Bookmark, 
+  User, 
+  Plus, 
+  Search, 
+  Bell, 
+  Users, 
+  Mail, 
+  Compass, 
+  Home, 
+  X, 
+  Upload, 
+  Camera, 
+  ChevronDown, 
   Settings,
-  Camera,
-  Send,
-  X,
-  Eye,
-  EyeOff,
+  MoreHorizontal,
+  Trash2,
+  ThumbsDown 
 } from "lucide-react"
 import api from "../utils/api"
 import { CLOUDINARY_UPLOAD_URL, CLOUDINARY_UPLOAD_PRESET, getApiBaseUrl } from "../config/constants"
@@ -61,7 +61,10 @@ export default function HomePage() {
   const [bookmarkedPosts, setBookmarkedPosts] = useState(new Set())
   const [openComments, setOpenComments] = useState(new Set())
   const [commentTexts, setCommentTexts] = useState({})
+  const [replyTexts, setReplyTexts] = useState({})
+  const [replyingTo, setReplyingTo] = useState(null)
   const [postComments, setPostComments] = useState({})
+  const [visibleReplies, setVisibleReplies] = useState(new Set())
 
   // New state for search and profile modals
   const [showSearchModal, setShowSearchModal] = useState(false)
@@ -108,10 +111,10 @@ export default function HomePage() {
   // Load conversations for unread badge
   const loadConversations = async () => {
     try {
-      const token = localStorage.getItem("token")
       const response = await api.get("/api/messages/conversations")
       setConversations(response.data || [])
     } catch (error) {
+      console.error("Error loading conversations:", error)
       setConversations([])
     }
   }
@@ -287,7 +290,7 @@ export default function HomePage() {
     if (!commentText || !commentText.trim()) return
 
     try {
-      const response = await api.post(`/api/posts/${postId}/comment`, { text: commentText })
+      const response = await api.post(`/api/posts/${postId}/comments`, { text: commentText })
 
       // Update local comments state with server response
       const newComments = { ...postComments }
@@ -314,8 +317,175 @@ export default function HomePage() {
     }
   }
 
-  const handleCommentChange = (postId, value) => {
-    setCommentTexts({ ...commentTexts, [postId]: value })
+  const handleCommentLike = async (postId, commentId) => {
+    try {
+      const response = await api.post(`/api/posts/${postId}/comments/${commentId}/like`)
+      
+      // Update local state
+      const updatedPosts = posts.map(post => {
+        if (post._id === postId) {
+          const updatedComments = post.comments.map(comment => {
+            if (comment._id === commentId) {
+              return {
+                ...comment,
+                likes: response.data.likes,
+                dislikes: response.data.dislikes,
+                likedBy: response.data.likedBy,
+                dislikedBy: response.data.dislikedBy
+              }
+            }
+            return comment
+          })
+          return { ...post, comments: updatedComments }
+        }
+        return post
+      })
+      setPosts(updatedPosts)
+    } catch (error) {
+      console.error("Error liking comment:", error)
+    }
+  }
+
+  const handleCommentDislike = async (postId, commentId) => {
+    try {
+      const response = await api.post(`/api/posts/${postId}/comments/${commentId}/dislike`)
+      
+      // Update local state
+      const updatedPosts = posts.map(post => {
+        if (post._id === postId) {
+          const updatedComments = post.comments.map(comment => {
+            if (comment._id === commentId) {
+              return {
+                ...comment,
+                likes: response.data.likes,
+                dislikes: response.data.dislikes,
+                likedBy: response.data.likedBy,
+                dislikedBy: response.data.dislikedBy
+              }
+            }
+            return comment
+          })
+          return { ...post, comments: updatedComments }
+        }
+        return post
+      })
+      setPosts(updatedPosts)
+    } catch (error) {
+      console.error("Error disliking comment:", error)
+    }
+  }
+
+  const handleReplySubmit = async (postId, commentId) => {
+    const replyText = replyTexts[commentId]
+    if (!replyText || !replyText.trim()) return
+
+    try {
+      const response = await api.post(`/api/posts/${postId}/comments/${commentId}/reply`, { text: replyText })
+      
+      // Update local state
+      const updatedPosts = posts.map(post => {
+        if (post._id === postId) {
+          const updatedComments = post.comments.map(comment => {
+            if (comment._id === commentId) {
+              return {
+                ...comment,
+                replies: [...(comment.replies || []), response.data]
+              }
+            }
+            return comment
+          })
+          return { ...post, comments: updatedComments }
+        }
+        return post
+      })
+      setPosts(updatedPosts)
+      
+      // Clear reply input and close reply box
+      setReplyTexts({ ...replyTexts, [commentId]: "" })
+      setReplyingTo(null)
+      
+      // Refresh posts to get updated data
+      loadPosts()
+    } catch (error) {
+      console.error("Error adding reply:", error)
+    }
+  }
+
+  const handleCommentChange = (postId, text) => {
+    setCommentTexts({ ...commentTexts, [postId]: text })
+  }
+
+  const handleReplyChange = (commentId, text) => {
+    setReplyTexts({ ...replyTexts, [commentId]: text })
+  }
+
+  const toggleReply = (commentId) => {
+    setReplyingTo(replyingTo === commentId ? null : commentId)
+  }
+
+  // Toggle replies visibility
+  const toggleRepliesVisibility = (commentId) => {
+    const newVisibleReplies = new Set(visibleReplies)
+    if (newVisibleReplies.has(commentId)) {
+      newVisibleReplies.delete(commentId)
+    } else {
+      newVisibleReplies.add(commentId)
+    }
+    setVisibleReplies(newVisibleReplies)
+  }
+
+  // Handle reply like functionality
+  const handleReplyLike = async (postId, commentId, replyId) => {
+    try {
+      const response = await api.post(`/api/posts/${postId}/comments/${commentId}/replies/${replyId}/like`)
+      
+      // Update local state
+      const updatedPosts = posts.map(post => {
+        if (post._id === postId) {
+          const updatedComments = post.comments.map(comment => {
+            if (comment._id === commentId) {
+              const updatedReplies = comment.replies.map(reply => {
+                if (reply._id === replyId) {
+                  return {
+                    ...reply,
+                    likes: response.data.likes,
+                    likedBy: response.data.likedBy
+                  }
+                }
+                return reply
+              })
+              return { ...comment, replies: updatedReplies }
+            }
+            return comment
+          })
+          return { ...post, comments: updatedComments }
+        }
+        return post
+      })
+      setPosts(updatedPosts)
+    } catch (error) {
+      console.error("Error liking reply:", error)
+    }
+  }
+
+  // Handle comment delete functionality
+  const handleCommentDelete = async (postId, commentId) => {
+    try {
+      await api.delete(`/api/posts/${postId}/comments/${commentId}`)
+      loadPosts() // Refresh posts to show updated comments
+    } catch (error) {
+      console.error("Error deleting comment:", error)
+    }
+  }
+
+  // Handle reply delete functionality
+  const handleReplyDelete = async (postId, commentId, replyId) => {
+    try {
+      await api.delete(`/api/posts/${postId}/comments/${commentId}/replies/${replyId}`)
+      loadPosts() // Refresh posts to show updated replies
+    } catch (error) {
+      console.error("Error deleting reply:", error)
+    }
   }
 
   // Handle search functionality
@@ -815,14 +985,11 @@ export default function HomePage() {
                                 isLiked ? "text-red-500" : "text-slate-300"
                               } hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all duration-300 group`}
                             >
-                              {isLiked ? (
-                                <HeartFilled
-                                  fill="currentColor"
-                                  className="w-5 h-5 group-hover:scale-110 transition-transform duration-300"
-                                />
-                              ) : (
-                                <HeartOutline className="w-5 h-5 group-hover:scale-110 transition-transform duration-300" />
-                              )}
+                              <Heart 
+                                className={`w-5 h-5 group-hover:scale-110 transition-transform duration-300 ${
+                                  isLiked ? 'fill-red-500' : 'fill-none'
+                                }`}
+                              />
                               <span className="font-medium">{post.likes || 0}</span>
                             </button>
                             <button
@@ -885,26 +1052,164 @@ export default function HomePage() {
                             </div>
 
                             {/* Comments List */}
-                            <div className="space-y-3">
+                            <div className="space-y-4">
                               {comments.map((comment) => (
-                                <div key={comment._id} className="flex space-x-3">
-                                  <div className="w-8 h-8 bg-gradient-to-br from-slate-600 to-slate-700 rounded-full flex items-center justify-center flex-shrink-0">
-                                    <User className="w-4 h-4 text-white" />
-                                  </div>
-                                  <div className="flex-1">
-                                    <div className="bg-slate-700/20 rounded-lg px-3 py-2">
-                                      <div className="flex items-center space-x-2 mb-1">
-                                        <span
-                                          className="text-sm font-medium text-white cursor-pointer hover:text-blue-300 transition-colors"
-                                          onClick={() => handleUserClick(comment.author?._id || comment.author)}
-                                        >
-                                          {comment.author?.name || comment.author || userName}
-                                        </span>
-                                        <span className="text-xs text-slate-400">
-                                          {new Date(comment.createdAt).toLocaleDateString()}
-                                        </span>
+                                <div key={comment._id} className="space-y-2">
+                                  {/* Main Comment */}
+                                  <div className="flex space-x-3">
+                                    <div className="w-8 h-8 bg-gradient-to-br from-slate-600 to-slate-700 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer"
+                                         onClick={() => handleUserClick(comment.author?._id || comment.author)}>
+                                      <User className="w-4 h-4 text-white" />
+                                    </div>
+                                    <div className="flex-1">
+                                      <div className="bg-slate-700/20 rounded-lg px-3 py-2">
+                                        <div className="flex items-center space-x-2 mb-1">
+                                          <span
+                                            className="text-sm font-medium text-white cursor-pointer hover:text-blue-300 transition-colors"
+                                            onClick={() => handleUserClick(comment.author?._id || comment.author)}
+                                          >
+                                            {comment.author?.name || comment.author || userName}
+                                          </span>
+                                          <span className="text-xs text-slate-400">
+                                            {new Date(comment.createdAt).toLocaleDateString()}
+                                          </span>
+                                        </div>
+                                        <p className="text-sm text-slate-200 mb-2">{comment.text}</p>
+                                        
+                                        {/* Comment Actions */}
+                                        <div className="flex items-center space-x-4 text-xs">
+                                          <button
+                                            onClick={() => handleCommentLike(post._id, comment._id)}
+                                            className={`flex items-center space-x-1 hover:text-red-400 transition-colors ${
+                                              comment.likedBy?.includes(userId) ? 'text-red-500' : 'text-slate-400'
+                                            }`}
+                                          >
+                                            <Heart className={`w-4 h-4 ${comment.likedBy?.includes(userId) ? 'fill-red-500' : 'fill-none'}`} />
+                                            <span>{comment.likes || 0}</span>
+                                          </button>
+                                          <button
+                                            onClick={() => handleCommentDislike(post._id, comment._id)}
+                                            className={`flex items-center space-x-1 hover:text-blue-400 transition-colors ${
+                                              comment.dislikedBy?.includes(userId) ? 'text-blue-500' : 'text-slate-400'
+                                            }`}
+                                          >
+                                            <ThumbsDown className="w-3 h-3" />
+                                            <span>{comment.dislikes || 0}</span>
+                                          </button>
+                                          <button
+                                            onClick={() => toggleReply(comment._id)}
+                                            className="text-slate-400 hover:text-white transition-colors"
+                                          >
+                                            Reply
+                                          </button>
+                                          {comment.replies && comment.replies.length > 0 && (
+                                            <button
+                                              onClick={() => toggleRepliesVisibility(comment._id)}
+                                              className="flex items-center space-x-1 text-slate-500 hover:text-white transition-colors"
+                                            >
+                                              <span>{comment.replies.length} replies</span>
+                                              <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${
+                                                visibleReplies.has(comment._id) ? 'rotate-180' : ''
+                                              }`} />
+                                            </button>
+                                          )}
+                                          {/* Delete comment button */}
+                                          {(userId === (comment.author?._id || comment.author) || userId === (post.author?._id || post.author)) && (
+                                            <button
+                                              onClick={() => handleCommentDelete(post._id, comment._id)}
+                                              className="text-slate-400 hover:text-red-400 transition-colors"
+                                            >
+                                              <Trash2 className="w-3 h-3" />
+                                            </button>
+                                          )}
+                                        </div>
                                       </div>
-                                      <p className="text-sm text-slate-200">{comment.text}</p>
+                                      
+                                      {/* Reply Input */}
+                                      {replyingTo === comment._id && (
+                                        <div className="mt-2 flex space-x-2">
+                                          <input
+                                            type="text"
+                                            placeholder="Write a reply..."
+                                            value={replyTexts[comment._id] || ""}
+                                            onChange={(e) => handleReplyChange(comment._id, e.target.value)}
+                                            className="flex-1 px-3 py-1 bg-slate-700/20 border border-slate-600/20 text-slate-200 placeholder-slate-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-sm"
+                                            onKeyPress={(e) => {
+                                              if (e.key === "Enter") {
+                                                handleReplySubmit(post._id, comment._id)
+                                              }
+                                            }}
+                                          />
+                                          <button
+                                            onClick={() => handleReplySubmit(post._id, comment._id)}
+                                            className="px-3 py-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium rounded-lg transition-all duration-300 text-xs"
+                                          >
+                                            Reply
+                                          </button>
+                                          <button
+                                            onClick={() => setReplyingTo(null)}
+                                            className="px-3 py-1 bg-slate-600 hover:bg-slate-700 text-white font-medium rounded-lg transition-all duration-300 text-xs"
+                                          >
+                                            Cancel
+                                          </button>
+                                        </div>
+                                      )}
+                                      
+                                      {/* Replies */}
+                                      {comment.replies && comment.replies.length > 0 && visibleReplies.has(comment._id) && (
+                                        <div className="mt-3 ml-4 space-y-2">
+                                          {comment.replies.map((reply) => (
+                                            <div key={reply._id} className="flex space-x-2">
+                                              <div className="w-6 h-6 bg-gradient-to-br from-slate-600 to-slate-700 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer"
+                                                   onClick={() => handleUserClick(reply.author?._id || reply.author)}>
+                                                <User className="w-3 h-3 text-white" />
+                                              </div>
+                                              <div className="flex-1">
+                                                <div className="bg-slate-800/20 rounded-lg px-2 py-1">
+                                                  <div className="flex items-center space-x-2 mb-1">
+                                                    <span
+                                                      className="text-xs font-medium text-white cursor-pointer hover:text-blue-300 transition-colors"
+                                                      onClick={() => handleUserClick(reply.author?._id || reply.author)}
+                                                    >
+                                                      {reply.author?.name || reply.author}
+                                                    </span>
+                                                    <span className="text-xs text-slate-500">
+                                                      {new Date(reply.createdAt).toLocaleDateString()}
+                                                    </span>
+                                                  </div>
+                                                  <p className="text-xs text-slate-200">{reply.text}</p>
+                                                  <div className="flex items-center justify-between mt-1">
+                                                    <div className="flex items-center space-x-2">
+                                                      <button
+                                                        onClick={() => handleReplyLike(post._id, comment._id, reply._id)}
+                                                        className={`flex items-center space-x-1 text-xs transition-colors ${
+                                                          reply.likedBy?.includes(userId) 
+                                                            ? 'text-red-500 hover:text-red-400' 
+                                                            : 'text-slate-400 hover:text-red-400'
+                                                        }`}
+                                                      >
+                                                        <Heart className={`w-3 h-3 ${reply.likedBy?.includes(userId) ? 'fill-red-500' : 'fill-none'}`} />
+                                                        <span>{reply.likes || 0}</span>
+                                                      </button>
+                                                    </div>
+                                                    {/* Delete reply button */}
+                                                    {(userId === (reply.author?._id || reply.author) || 
+                                                      userId === (comment.author?._id || comment.author) ||
+                                                      userId === (post.author?._id || post.author)) && (
+                                                      <button
+                                                        onClick={() => handleReplyDelete(post._id, comment._id, reply._id)}
+                                                        className="text-slate-400 hover:text-red-400 transition-colors"
+                                                      >
+                                                        <Trash2 className="w-3 h-3" />
+                                                      </button>
+                                                    )}
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                 </div>

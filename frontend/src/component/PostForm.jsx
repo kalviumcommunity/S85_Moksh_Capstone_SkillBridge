@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 
 const PostForm = () => {
   const [caption, setCaption] = useState('');
@@ -10,7 +10,7 @@ const PostForm = () => {
     const formData = new FormData();
     formData.append('caption', caption);
     formData.append('image', image);
-    await axios.post('/api/posts', formData);
+    await api.post('/api/posts', formData);
   };
 
   return (

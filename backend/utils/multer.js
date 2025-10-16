@@ -1,26 +1,19 @@
 const multer = require('multer');
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const cloudinary = require('./cloudinary');
 
-let storage;
+// Always use Cloudinary storage
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'skillbridge-posts',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+    transformation: [{ width: 1000, height: 1000, crop: 'limit', quality: 'auto' }]
+  }
+});
 
-try {
-  // Try to use Cloudinary storage
-  const { CloudinaryStorage } = require('multer-storage-cloudinary');
-  const cloudinary = require('./cloudinary');
+console.log('✅ Using Cloudinary storage');
 
-  storage = new CloudinaryStorage({
-    cloudinary: cloudinary,
-    params: {
-      folder: 'skillbridge-posts',
-      allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
-      transformation: [{ width: 1000, height: 1000, crop: 'limit', quality: 'auto' }]
-    }
-  });
-  
-  console.log('Using Cloudinary storage');
-} catch (error) {
-  // Fallback to memory storage if Cloudinary fails
-  console.error('Cloudinary storage failed, using memory storage:', error.message);
-  storage = multer.memoryStorage();
-}
+const upload = multer({ storage });
 
-module.exports = multer({ storage });
+module.exports = upload;

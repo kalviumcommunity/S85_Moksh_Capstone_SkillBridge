@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import api from '../utils/api';
 
 export default function ProfileModal({ user, connections, onClose, onProfileUpdate, onProfilePictureUpload, onRemoveConnection, uploadError }) {
   const [editMode, setEditMode] = useState(false);
@@ -50,7 +51,7 @@ export default function ProfileModal({ user, connections, onClose, onProfileUpda
   const handleLogout = async () => {
     try {
       // Optionally notify the backend (stateless logout)
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await api.post('/api/auth/logout');
     } catch {
       // Ignore errors, just proceed to logout on client
     }

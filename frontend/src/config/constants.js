@@ -8,7 +8,7 @@ export const CONFIG = {
     ENDPOINTS: {
       // Auth endpoints
       LOGIN: '/api/auth/login',
-      REGISTER: '/api/auth/register',
+      SIGNUP: '/api/auth/signup',
       LOGOUT: '/api/auth/logout',
       
       // User endpoints
@@ -66,9 +66,16 @@ export const CONFIG = {
 export const getApiBaseUrl = () => {
   // Check if we're in development or production
   const isDevelopment = import.meta.env.DEV
-  return isDevelopment 
-    ? CONFIG.ENV.DEVELOPMENT.API_BASE_URL 
-    : CONFIG.ENV.PRODUCTION.API_BASE_URL
+  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  
+  // Use localhost backend when running locally, production when deployed
+  if (isDevelopment || isLocalhost) {
+    console.log('🌐 [API Config] Using DEVELOPMENT API:', CONFIG.ENV.DEVELOPMENT.API_BASE_URL)
+    return CONFIG.ENV.DEVELOPMENT.API_BASE_URL
+  } else {
+    console.log('🌐 [API Config] Using PRODUCTION API:', CONFIG.ENV.PRODUCTION.API_BASE_URL)
+    return CONFIG.ENV.PRODUCTION.API_BASE_URL
+  }
 }
 
 // Helper function to build full API URLs

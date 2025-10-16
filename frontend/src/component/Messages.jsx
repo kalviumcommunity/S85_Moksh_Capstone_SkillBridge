@@ -9,16 +9,18 @@ import { useSocket } from '../SocketContext'
 export default function Messages({ onClose, reloadConversations, conversations }) {
   const [selectedConv, setSelectedConversation] = useState(null)
   const [selectedUser, setSelectedUser] = useState(null) // <-- for new chat
+  const [lastSelectedConvId, setLastSelectedConvId] = useState(null) // Remember last selected conversation
   const [messages, setMessages] = useState([])
   const [newMessage, setNewMessage] = useState("")
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [userId, setUserId] = useState(null)
   const [currentUser, setCurrentUser] = useState(null)
+  const [connections, setConnections] = useState([]) // Add connections state
   const messagesEndRef = useRef(null)
   const [isTyping, setIsTyping] = useState(false)
   const [typingTimeout, setTypingTimeout] = useState(null)
-  const socket = useSocket()
+  const { socket, isConnected, isAuthenticated, emit, on, off, once } = useSocket()
   // Add refs for latest selectedConv and selectedUser
   const selectedConvRef = useRef(selectedConv);
   const selectedUserRef = useRef(selectedUser);
@@ -35,8 +37,12 @@ export default function Messages({ onClose, reloadConversations, conversations }
   const safeMessages = Array.isArray(messages) ? messages : [];
 
   useEffect(() => {
+    console.log('🚀 [Frontend] Messages component mounted');
     loadUserData()
     loadConversations()
+    loadConnections() // Load connections
+    
+    // Don't auto-select conversations - show connections list first
   }, [])
 
   useEffect(() => {
@@ -44,75 +50,178 @@ export default function Messages({ onClose, reloadConversations, conversations }
     selectedUserRef.current = selectedUser;
   }, [selectedConv, selectedUser]);
 
+  // Socket event listeners - simplified and optimized
   useEffect(() => {
-    if (!socket) return;
-    // Remove previous listeners to avoid duplicates
-    socket.off("newMessage");
-    socket.off("typing");
-    socket.off("status");
+    if (!socket || !userId || !isConnected) return;
 
-    socket.on("newMessage", (message) => {
-      if (
-        selectedConvRef.current &&
-        (message.conversation === selectedConvRef.current._id || message.conversation?._id === selectedConvRef.current._id)
-      ) {
-        setMessages((prev) => [...prev, message]);
+    console.log('🔗 [Frontend] Setting up socket listeners - connected:', isConnected, 'authenticated:', isAuthenticated);
+
+    const handleNewMessage = (message) => {
+      console.log('📨 [Socket] New message received:', message);
+      console.log('📨 [Socket] Current state - selectedConv:', selectedConvRef.current?._id, 'selectedUser:', selectedUserRef.current?._id);
+      
+      // Validate message structure
+      if (!message || !message._id || !message.content) {
+        console.warn('⚠️ [Socket] Invalid message structure received:', message);
+        return;
+      }
+      
+      // Check if message belongs to current conversation
+      const currentConvId = selectedConvRef.current?._id;
+      const currentUserId = selectedUserRef.current?._id;
+      
+      // Get message sender and receiver IDs (handle both populated and non-populated)
+      const senderId = message.sender?._id || message.sender;
+      const receiverId = message.receiver?._id || message.receiver;
+      
+      console.log('📨 [Socket] Message details - sender:', senderId, 'receiver:', receiverId, 'conversation:', message.conversation);
+      
+      // Add message if it's for current conversation
+      if (currentConvId && message.conversation === currentConvId) {
+        console.log('✅ [Socket] Adding message to current conversation');
+        setMessages(prev => {
+          // Prevent duplicates
+          if (prev.some(m => m._id === message._id)) return prev;
+          return [...prev, message];
+        });
+      }
+      // Add message if it's for current user chat (when no conversation selected yet)
+      else if (currentUserId && !currentConvId && 
+        (senderId === currentUserId || receiverId === currentUserId ||
+         senderId === userId || receiverId === userId)) {
+        console.log('✅ [Socket] Adding message to current user chat');
+        setMessages(prev => {
+          // Prevent duplicates
+          if (prev.some(m => m._id === message._id)) return prev;
+          return [...prev, message];
+        });
+      }
+      // Add message if it involves the current user (sender or receiver)
+      else if ((senderId === userId || receiverId === userId) && 
+               (currentConvId || currentUserId)) {
+        console.log('✅ [Socket] Adding message involving current user');
+        setMessages(prev => {
+          // Prevent duplicates
+          if (prev.some(m => m._id === message._id)) return prev;
+          return [...prev, message];
+        });
       } else {
-        // Show notification for new message if not in this conversation
-        if (window.Notification && Notification.permission === "granted") {
-          new Notification("New message", { body: message.content });
+        console.log('⚠️ [Socket] Message not for current conversation/user, skipping');
+      }
+      
+      // Always reload conversations to update last message
+      if (reloadConversations) {
+        setTimeout(() => reloadConversations(), 100);
+      }
+    };
+
+    const handleTyping = (data) => {
+      console.log('⌨️ [Socket] Typing event:', data);
+      
+      // Validate typing data
+      if (!data || !data.conversationId || !data.userId) {
+        console.warn('⚠️ [Socket] Invalid typing data received:', data);
+        return;
+      }
+      
+      const currentConvId = selectedConvRef.current?._id;
+      
+      if (data.conversationId === currentConvId && data.userId !== userId) {
+        const isTypingNow = data.isTyping !== false; // default to true
+        setIsTyping(isTypingNow);
+        
+        if (typingTimeout) clearTimeout(typingTimeout);
+        
+        if (isTypingNow) {
+          const timeout = setTimeout(() => setIsTyping(false), 3000);
+          setTypingTimeout(timeout);
         }
       }
-      reloadConversations();
-    });
-    socket.on("typing", (data) => {
-      const conv = selectedConvRef.current;
-      const user = selectedUserRef.current;
-      let convId = conv?._id;
-      let otherId = conv ? conv.otherParticipant?._id : user?._id;
-      if (
-        data &&
-        data.conversationId === convId &&
-        data.userId === otherId
-      ) {
-        setIsTyping(true);
-        if (typingTimeout) clearTimeout(typingTimeout);
-        const timeout = setTimeout(() => setIsTyping(false), 1000);
-        setTypingTimeout(timeout);
-      }
-    });
-    socket.on("status", (data) => {
-      // Also update selectedConv/selectedUser if open
-      if (selectedConvRef.current && selectedConvRef.current.otherParticipant && selectedConvRef.current.otherParticipant._id === data.userId) {
-        setSelectedConversation({
-          ...selectedConvRef.current,
-          otherParticipant: {
-            ...selectedConvRef.current.otherParticipant,
-            isOnline: data.isOnline,
-            lastSeen: data.lastSeen || selectedConvRef.current.otherParticipant.lastSeen,
-          }
-        });
-      }
-      if (selectedUserRef.current && selectedUserRef.current._id === data.userId) {
-        setSelectedUser({
-          ...selectedUserRef.current,
-          isOnline: data.isOnline,
-          lastSeen: data.lastSeen || selectedUserRef.current.lastSeen,
-        });
-      }
-      reloadConversations();
-    });
-  }, [socket, typingTimeout]);
+    };
 
+    const handleStatus = (data) => {
+      console.log('🟢 [Socket] Status update:', data);
+      
+      // Update selected conversation participant status
+      if (selectedConvRef.current?.otherParticipant?._id === data.userId) {
+        setSelectedConversation(prev => ({
+          ...prev,
+          otherParticipant: {
+            ...prev.otherParticipant,
+            isOnline: data.isOnline,
+            lastSeen: data.lastSeen
+          }
+        }));
+      }
+      
+      // Update selected user status
+      if (selectedUserRef.current?._id === data.userId) {
+        setSelectedUser(prev => ({
+          ...prev,
+          isOnline: data.isOnline,
+          lastSeen: data.lastSeen
+        }));
+      }
+      
+      if (reloadConversations) reloadConversations();
+    };
+
+    // Handle socket errors
+    const handleSocketError = (error) => {
+      console.error('❌ [Socket] Socket error in Messages:', error);
+      // Could show user notification here
+    };
+    
+    const handleMessageDelivered = (data) => {
+      console.log('✅ [Socket] Message delivered confirmation:', data);
+      // Could update message status in UI
+    };
+
+    // Add event listeners
+    on('newMessage', handleNewMessage);
+    on('typing', handleTyping);
+    on('status', handleStatus);
+    on('error', handleSocketError);
+    on('messageDelivered', handleMessageDelivered);
+
+    // Cleanup
+    return () => {
+      off('newMessage', handleNewMessage);
+      off('typing', handleTyping);
+      off('status', handleStatus);
+      off('error', handleSocketError);
+      off('messageDelivered', handleMessageDelivered);
+      if (typingTimeout) clearTimeout(typingTimeout);
+    };
+  }, [socket, userId, isConnected, isAuthenticated]);
+
+  // Load messages when conversation/user selection changes - optimized
   useEffect(() => {
+    if (!userId) return;
+    
+    console.log('🔄 [Frontend] Selection changed - selectedConv:', selectedConv?._id, 'selectedUser:', selectedUser?._id);
+    
     if (selectedConv) {
-      const otherParticipant = getOtherParticipant(selectedConv.participants, userId)
-      loadMessages(otherParticipant?._id)
-      setSelectedUser(null)
-    } else if (selectedUser) {
-      loadMessages(selectedUser._id)
+      console.log('📋 [Frontend] Loading messages for conversation:', selectedConv._id);
+      console.log('📋 [Frontend] Conversation participants:', selectedConv.participants);
+      
+      const otherParticipant = getOtherParticipant(selectedConv.participants, userId);
+      console.log('📋 [Frontend] Other participant found:', otherParticipant?._id);
+      
+      if (otherParticipant?._id) {
+        loadMessages(otherParticipant._id);
+      } else {
+        console.log('⚠️ [Frontend] No other participant found in conversation');
+      }
+      setSelectedUser(null);
+    } else if (selectedUser?._id) {
+      console.log('📋 [Frontend] Loading messages for user:', selectedUser._id);
+      loadMessages(selectedUser._id);
+    } else {
+      // Don't clear messages immediately - let them persist
+      console.log('⚠️ [Frontend] No selection, keeping existing messages');
     }
-  }, [selectedConv, selectedUser])
+  }, [selectedConv?._id, selectedUser?._id, userId])
 
   // Remove setTimeout and just scroll directly
   const scrollToBottom = () => {
@@ -152,41 +261,121 @@ export default function Messages({ onClose, reloadConversations, conversations }
   }
 
   const loadConversations = async () => {
+    console.log('📋 [Frontend] Loading conversations');
     try {
       const response = await api.get("/api/messages/conversations")
+      console.log('✅ [Frontend] Conversations loaded:', response.data?.length || 0);
+      // The conversations are passed as props, but we can also reload them here if needed
+      if (reloadConversations) {
+        reloadConversations()
+      }
     } catch (error) {
-      console.error("Error loading conversations:", error)
+      console.error('❌ [Frontend] Error loading conversations:', error);
+      console.error('❌ [Frontend] Error details:', error.response?.data || error.message);
     } finally {
       setLoading(false)
     }
   }
 
+  const loadConnections = async () => {
+    console.log('📋 [Frontend] Loading connections');
+    try {
+      const response = await api.get("/api/connections")
+      console.log('✅ [Frontend] Connections loaded:', response.data?.length || 0);
+      setConnections(response.data || [])
+    } catch (error) {
+      console.error('❌ [Frontend] Error loading connections:', error);
+    }
+  }
+
+  // Don't auto-select conversations - let user choose from connections list
+  // useEffect(() => {
+  //   if (conversations && conversations.length > 0 && !selectedConv && !selectedUser && userId) {
+  //     console.log('🔄 [Frontend] Auto-selecting conversation after conversations loaded');
+  //     
+  //     // Try to restore last selected conversation first
+  //     let targetConv = null;
+  //     if (lastSelectedConvId) {
+  //       targetConv = conversations.find(conv => conv._id === lastSelectedConvId);
+  //       console.log('🔄 [Frontend] Attempting to restore last selected conversation:', lastSelectedConvId);
+  //       if (targetConv) {
+  //         console.log('✅ [Frontend] Restored last selected conversation:', targetConv._id);
+  //       } else {
+  //         console.log('⚠️ [Frontend] Last selected conversation not found in current list');
+  //       }
+  //     }
+  //     
+  //     // If no last selected or not found, use first conversation
+  //     if (!targetConv && conversations.length > 0) {
+  //       targetConv = conversations[0];
+  //       console.log('🔄 [Frontend] Using first conversation as fallback:', targetConv._id);
+  //     }
+  //     
+  //     if (targetConv) {
+  //       setSelectedConversation(targetConv);
+  //     }
+  //   }
+  // }, [conversations.length, userId]) // Simplified dependencies to prevent loop
+
 const loadMessages = async (id, beforeId = null, append = false) => {
+  // Prevent duplicate calls
+  if (loading && !append) {
+    console.log('🚫 [Frontend] Already loading messages, skipping duplicate call');
+    return;
+  }
+  
+  console.log('📥 [Frontend] Loading messages - id:', id, 'beforeId:', beforeId, 'append:', append);
+  console.log('📋 [Frontend] Current state - selectedConv:', selectedConv?._id, 'selectedUser:', selectedUser?._id);
+  
+  if (!append) setLoading(true);
+  
   try {
     const token = localStorage.getItem("token");
     let url;
+    let targetUserId;
 
+    // Determine the target user ID for the API call
     if (selectedConv && selectedConv.otherParticipant?._id) {
-      url = `/api/messages/user/${selectedConv.otherParticipant._id}`;
+      targetUserId = selectedConv.otherParticipant._id;
+      url = `/api/messages/user/${targetUserId}`;
+      console.log('🔗 [Frontend] Using conversation URL:', url);
     } else if (selectedUser && selectedUser._id) {
-      url = `/api/messages/user/${selectedUser._id}`;
+      targetUserId = selectedUser._id;
+      url = `/api/messages/user/${targetUserId}`;
+      console.log('🔗 [Frontend] Using user URL:', url);
     } else if (id) {
-      url = `/api/messages/user/${id}`;
+      targetUserId = id;
+      url = `/api/messages/user/${targetUserId}`;
+      console.log('🔗 [Frontend] Using provided ID URL:', url);
     } else {
-      setMessages([]);
+      console.log('⚠️ [Frontend] No valid ID found, keeping existing messages');
+      setLoading(false);
+      return; // Don't clear messages, just return
+    }
+
+    // Validate that we have a proper user ID
+    if (!targetUserId || !targetUserId.match(/^[0-9a-fA-F]{24}$/)) {
+      console.log('⚠️ [Frontend] Invalid user ID format:', targetUserId);
+      setLoading(false);
       return;
     }
 
     if (beforeId) {
       url += `?before=${beforeId}`;
+      console.log('📄 [Frontend] Added pagination parameter:', url);
     }
 
+    console.log('🌐 [Frontend] Making API call to:', url);
     const response = await api.get(url);
+    console.log('✅ [Frontend] Messages loaded:', response.data?.length || 0);
 
-    const newMessages = response.data || [];
+    const newMessages = Array.isArray(response.data) ? response.data : [];
+    
     if (append) {
+      console.log('➕ [Frontend] Appending messages to existing list');
       setMessages((prev) => [...newMessages, ...prev]);
     } else {
+      console.log('🔄 [Frontend] Replacing messages list');
       setMessages(newMessages);
     }
 
@@ -194,57 +383,128 @@ const loadMessages = async (id, beforeId = null, append = false) => {
     if (newMessages.length > 0) {
       setOldestMessageId(newMessages[0]._id);
     }
-    reloadConversations();
+    
+    // Only reload conversations occasionally, not on every message load
+    if (!append && Math.random() < 0.3) {
+      reloadConversations();
+    }
   } catch (error) {
-    console.error("Error loading messages:", error);
-    setMessages([]);
+    console.error('❌ [Frontend] Error loading messages:', error);
+    console.error('❌ [Frontend] Error details:', error.response?.data || error.message);
+    
+    // Only clear messages if it's a 404 or authentication error
+    if (error.response?.status === 404 || error.response?.status === 401) {
+      setMessages([]);
+    }
     setHasMore(false);
+  } finally {
+    setLoading(false);
   }
 };
 
 
   const sendMessage = async () => {
-    if (!newMessage.trim()) return
+    if (!newMessage.trim()) return;
+    
+    const messageContent = newMessage;
+    setNewMessage(""); // Clear input immediately for better UX
+    
     try {
-      const token = localStorage.getItem("token")
-      let payload
+      let payload;
+      let receiverId;
+      
       if (selectedConv) {
-        payload = { conversationId: selectedConv._id, content: newMessage }
+        payload = { conversationId: selectedConv._id, content: messageContent };
+        // Use otherParticipant directly from conversation object
+        receiverId = selectedConv.otherParticipant?._id || getOtherParticipant(selectedConv.participants, userId)?._id;
+        console.log('📤 [Frontend] Conversation mode - otherParticipant:', selectedConv.otherParticipant);
+        console.log('📤 [Frontend] Conversation participants:', selectedConv.participants);
       } else if (selectedUser) {
-        payload = { receiverId: selectedUser._id, content: newMessage }
+        payload = { receiverId: selectedUser._id, content: messageContent };
+        receiverId = selectedUser._id;
+        console.log('📤 [Frontend] User mode - selectedUser:', selectedUser);
       } else {
-        alert("Please select a user to chat with.")
-        return
+        alert("Please select a user to chat with.");
+        setNewMessage(messageContent); // Restore message
+        return;
       }
-      const response = await api.post("/api/messages", payload)
-      setMessages([...messages, response.data])
-      setNewMessage("")
-      // Emit via Socket.IO for live update
-      if (socket) {
-        socket.emit("sendMessage", response.data)
+      
+      // Ensure receiverId is valid
+      if (!receiverId) {
+        console.error('❌ [Frontend] No valid receiverId found');
+        console.log('📋 [Frontend] Debug - selectedConv:', selectedConv);
+        console.log('📋 [Frontend] Debug - selectedUser:', selectedUser);
+        console.log('📋 [Frontend] Debug - userId:', userId);
       }
-      reloadConversations()
-      if (!selectedConv && selectedUser) {
-        await loadConversations()
-        const token = localStorage.getItem("token")
-        const updatedConvs = await api.get("/api/messages/conversations")
-        const newConv = updatedConvs.data.find(conv =>
-          conv.otherParticipant && conv.otherParticipant._id === selectedUser._id
-        )
-        if (newConv) {
-          setSelectedConversation(newConv)
-          setSelectedUser(null)
+      
+      console.log('📤 [Frontend] Sending message:', payload);
+      console.log('📤 [Frontend] Receiver ID:', receiverId);
+      
+      const response = await api.post("/api/messages", payload);
+      console.log('✅ [Frontend] Message sent successfully:', response.data);
+      
+      // Add message to local state immediately
+      setMessages(prev => {
+        // Prevent duplicates
+        if (prev.some(m => m._id === response.data._id)) return prev;
+        return [...prev, response.data];
+      });
+      
+      // Emit via Socket.IO for real-time delivery to other user
+      if (isConnected && isAuthenticated && receiverId) {
+        console.log('📡 [Frontend] Emitting socket message to:', receiverId);
+        console.log('📡 [Frontend] Socket status - connected:', isConnected, 'authenticated:', isAuthenticated);
+        
+        const success = emit("sendMessage", {
+          ...response.data,
+          receiverId: receiverId
+        });
+        
+        if (!success) {
+          console.warn('⚠️ [Frontend] Failed to emit socket message - connection issue');
         }
+      } else {
+        console.log('⚠️ [Frontend] Cannot emit socket message - connected:', isConnected, 'authenticated:', isAuthenticated, 'receiverId:', receiverId);
       }
-      reloadConversations()
+      
+      // Handle new conversation creation
+      if (!selectedConv && selectedUser) {
+        console.log('🔄 [Frontend] Creating new conversation, reloading conversations');
+        if (reloadConversations) {
+          await reloadConversations();
+        }
+        // Find the new conversation after reload
+        setTimeout(() => {
+          const newConv = conversations.find(conv =>
+            conv.otherParticipant && conv.otherParticipant._id === selectedUser._id
+          );
+          if (newConv) {
+            console.log('✅ [Frontend] Found new conversation:', newConv._id);
+            setSelectedConversation(newConv);
+            setSelectedUser(null);
+          }
+        }, 500);
+      } else {
+        // Just reload conversations to update last message
+        if (reloadConversations) reloadConversations();
+      }
+      
     } catch (error) {
-      console.error("Error sending message:", error)
+      console.error('❌ [Frontend] Error sending message:', error);
+      console.error('❌ [Frontend] Error details:', error.response?.data || error.message);
+      setNewMessage(messageContent); // Restore message on error
+      alert('Failed to send message. Please try again.');
     }
   }
 
   const getOtherParticipant = (participants, userId) => {
-    if (!participants || !Array.isArray(participants)) return null
-    return participants.find((p) => String(p._id || p.id || p) !== String(userId)) || null
+    if (!participants || !Array.isArray(participants)) {
+      console.log('⚠️ [Frontend] getOtherParticipant - participants invalid:', participants);
+      return null;
+    }
+    const other = participants.find((p) => String(p._id || p.id || p) !== String(userId));
+    console.log('📋 [Frontend] getOtherParticipant - found:', other);
+    return other || null;
   }
 
   // Display name logic: prefer username if name is generic or missing
@@ -290,20 +550,24 @@ const loadMessages = async (id, beforeId = null, append = false) => {
     return null;
   };
 
-  const handleTyping = async (e) => {
+  const handleTyping = (e) => {
     setNewMessage(e.target.value);
-    let convId = selectedConv?._id;
-    // If no conversation, try to create/find it
-    if (!convId && (selectedUser && selectedUser._id)) {
-      convId = await ensureConversationId(selectedUser._id);
+    
+    // Emit typing indicator
+    if (isConnected && isAuthenticated && userId) {
+      const convId = selectedConv?._id;
+      if (convId) {
+        const success = emit("typing", {
+          conversationId: convId,
+          userId: userId,
+          isTyping: e.target.value.length > 0
+        });
+        
+        if (!success) {
+          console.warn('⚠️ [Frontend] Failed to emit typing event');
+        }
+      }
     }
-    if (socket && convId) {
-      socket.emit("typing", {
-        conversationId: convId,
-        userId: userId,
-      });
-    }
-    // ... local typing state for input (not for indicator)
   };
 
   const filteredConversations = conversations.filter((conv) => {
@@ -311,28 +575,57 @@ const loadMessages = async (id, beforeId = null, append = false) => {
     return displayName.toLowerCase().includes(searchTerm.toLowerCase())
   })
 
+  // Filter connections that don't have conversations yet
+  const availableConnections = connections.filter((conn) => {
+    const hasConversation = conversations.some(conv => 
+      conv.otherParticipant?._id === conn.user._id
+    )
+    const displayName = getDisplayName(conn.user)
+    return !hasConversation && displayName.toLowerCase().includes(searchTerm.toLowerCase())
+  })
+
+  // Combine conversations and available connections for display
+  const allChatItems = [...filteredConversations, ...availableConnections.map(conn => ({
+    _id: `connection-${conn._id}`,
+    isConnection: true,
+    otherParticipant: conn.user,
+    lastMessage: null,
+    unreadCount: 0
+  }))]
+
+  const handleConnectionClick = (connection) => {
+    console.log('🔄 [Frontend] Selected connection for new chat:', connection.user._id);
+    setSelectedUser(connection.user)
+    setSelectedConversation(null)
+    setMessages([])
+  }
+
   // Example: handle selecting a user from a search or connections list
   // Call this when you click a user to start a new chat
   const handleStartChat = (user) => {
     setSelectedUser(user)
     setSelectedConversation(null)
-    setMessages([])
+    // Don't clear messages immediately - let loadMessages handle it
   }
 
-  // When conversations are updated, update selectedConv to the latest object
+  // When conversations are updated, update selectedConv to the latest object - optimized
   useEffect(() => {
     if (selectedConv && conversations.length > 0) {
       const updated = conversations.find(conv => conv._id === selectedConv._id);
-      if (updated) setSelectedConversation(updated);
+      if (updated && updated !== selectedConv) {
+        setSelectedConversation(updated);
+      }
     }
-  }, [conversations]);
+  }, [conversations, selectedConv?._id]);
 
   // When selecting a conversation, always use the latest object from conversations
   const handleSelectConversation = (conv) => {
     const updated = conversations.find(c => c._id === conv._id) || conv;
     setSelectedConversation(updated);
     setSelectedUser(null);
-    setMessages([]);
+    // Remember this conversation for next time
+    setLastSelectedConvId(updated._id);
+    // Don't clear messages immediately - let loadMessages handle it
     setIsTyping(false);
   };
 
@@ -478,7 +771,7 @@ const loadMessages = async (id, beforeId = null, append = false) => {
             onClick={async () => {
               setSelectedConversation(null)
               setSelectedUser(null)
-              setMessages([])
+              // Keep messages in state for better UX
               setIsTyping(false)
               await reloadConversations();
             }}
@@ -500,13 +793,13 @@ const loadMessages = async (id, beforeId = null, append = false) => {
               maxHeight: '100%',
             }}
           >
-            {filteredConversations.length === 0 ? (
+            {allChatItems.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full p-6 text-center">
                 <div className="w-16 h-16 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-2xl flex items-center justify-center mb-4 border border-blue-500/20">
                   <MessageCircle className="w-8 h-8 text-slate-400" />
                 </div>
                 <h3 className="text-lg font-semibold text-white mb-2">No conversations yet</h3>
-                <p className="text-slate-400 text-sm mb-4">Connect with others to start messaging</p>
+                <p className="text-slate-400 text-sm mb-4">You have no connections to message</p>
                 <button
                   onClick={onClose}
                   className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium rounded-lg transition-all duration-300 text-sm"
@@ -515,30 +808,61 @@ const loadMessages = async (id, beforeId = null, append = false) => {
                 </button>
               </div>
             ) : (
-              filteredConversations.map((conversation) => {
+              allChatItems.map((item) => {
+                if (item.isConnection) {
+                  // Render connection item
+                  const displayName = getDisplayName(item.otherParticipant)
+                  return (
+                    <button
+                      key={item._id}
+                      onClick={() => handleConnectionClick({ user: item.otherParticipant })}
+                      className="w-full p-3 hover:bg-slate-800/50 transition-colors duration-200 text-left border-b border-slate-800/50 flex items-center gap-3"
+                    >
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
+                        {displayName.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-medium text-white text-sm truncate">
+                            {displayName}
+                          </span>
+                          <span className="text-xs text-blue-400 ml-2 flex-shrink-0">
+                            New Chat
+                          </span>
+                        </div>
+                        <p className="text-slate-400 text-xs truncate">
+                          Start a conversation
+                        </p>
+                      </div>
+                    </button>
+                  )
+                }
+                
+                // Render conversation item
+                const conversation = item
                 const displayName = getDisplayName(conversation.otherParticipant)
                 return (
                   <button
                     key={conversation._id}
                     onClick={() => handleSelectConversation(conversation)}
-                    className={`w-full p-4 flex items-center space-x-3 hover:bg-slate-800/20 transition-all duration-300 border-b border-slate-800/10 ${
-                      selectedConv?._id === conversation._id ? "bg-slate-800/30" : ""
+                    className={`w-full p-3 hover:bg-slate-800/50 transition-colors duration-200 text-left border-b border-slate-800/50 flex items-center gap-3 ${
+                      selectedConv?._id === conversation._id ? "bg-slate-800/70" : ""
                     }`}
                   >
-                    <div className="relative w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                      <span className="text-white font-semibold text-sm">{displayName.charAt(0).toUpperCase()}</span>
-                      {conversation.otherParticipant?.isOnline ? (
-                        <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-slate-800 rounded-full"></div>
-                      ) : (
-                        <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-gray-500 border-2 border-slate-800 rounded-full"></div>
-                      )}
+                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
+                      {displayName.charAt(0).toUpperCase()}
                     </div>
-                    <div className="flex-1 text-left">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-medium text-white text-sm">{displayName}</h4>
-                        <span className="text-xs text-slate-400">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium text-white text-sm truncate">
+                          {displayName}
+                        </span>
+                        <span className="text-xs text-slate-400 flex-shrink-0">
                           {conversation.lastMessage?.createdAt
-                            ? new Date(conversation.lastMessage.createdAt).toLocaleDateString()
+                            ? new Date(conversation.lastMessage.createdAt).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
                             : ""}
                         </span>
                       </div>

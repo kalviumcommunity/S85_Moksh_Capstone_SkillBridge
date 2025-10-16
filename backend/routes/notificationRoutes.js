@@ -4,7 +4,8 @@ const auth = require('../middleware/auth');
 const {
   getNotifications,
   markAsRead,
-  markAllAsRead
+  markAllAsRead,
+  deleteNotification
 } = require('../controllers/notificationController');
 
 // All routes require authentication
@@ -18,5 +19,8 @@ router.put('/:id/read', markAsRead);
 
 // @route PUT /api/notifications/read-all
 router.put('/read-all', markAllAsRead);
+
+// @route DELETE /api/notifications/:id
+router.delete('/:id', deleteNotification);
 
 module.exports = router;

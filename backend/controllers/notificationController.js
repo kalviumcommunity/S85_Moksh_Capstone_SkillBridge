@@ -8,7 +8,20 @@ exports.getNotifications = async (req, res) => {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    const notifications = await Notification.find({ recipient: req.user._id })
+    const { type, read } = req.query;
+    let filter = { recipient: req.user._id };
+
+    // Filter by type if specified
+    if (type && type !== 'all') {
+      filter.type = type;
+    }
+
+    // Filter by read status if specified
+    if (read !== undefined) {
+      filter.read = read === 'true';
+    }
+
+    const notifications = await Notification.find(filter)
       .populate('sender', 'name avatarUrl')
       .populate('postId', 'imageUrl caption')
       .sort({ createdAt: -1 })
@@ -60,6 +73,30 @@ exports.markAllAsRead = async (req, res) => {
     );
 
     res.json({ message: 'All notifications marked as read' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc Delete notification
+// @route DELETE /api/notifications/:id
+exports.deleteNotification = async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    const notification = await Notification.findOneAndDelete({
+      _id: req.params.id,
+      recipient: req.user._id
+    });
+
+    if (!notification) {
+      return res.status(404).json({ message: 'Notification not found' });
+    }
+
+    res.json({ message: 'Notification deleted successfully' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error' });

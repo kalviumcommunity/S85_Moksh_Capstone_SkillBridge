@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { X, UserPlus, MessageCircle, MapPin, Link, Calendar, Heart, Camera } from "lucide-react"
-import axios from "axios"
+import api from "../utils/api"
 
 export default function UserProfileModal({ userId, isOpen, onClose, onStartConversation }) {
   const [user, setUser] = useState(null)
@@ -33,10 +33,7 @@ export default function UserProfileModal({ userId, isOpen, onClose, onStartConve
 
   const loadUserProfile = async () => {
     try {
-      const token = localStorage.getItem("token")
-      const response = await axios.get(`/api/users/${userId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const response = await api.get(`/api/users/${userId}`)
       setUser(response.data)
     } catch (error) {
       console.error("Error loading user profile:", error)
@@ -45,10 +42,7 @@ export default function UserProfileModal({ userId, isOpen, onClose, onStartConve
 
   const loadUserPosts = async () => {
     try {
-      const token = localStorage.getItem("token")
-      const response = await axios.get(`/api/users/${userId}/posts`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const response = await api.get(`/api/users/${userId}/posts`)
       setUserPosts(response.data || [])
     } catch (error) {
       console.error("Error loading user posts:", error)
@@ -60,10 +54,7 @@ export default function UserProfileModal({ userId, isOpen, onClose, onStartConve
 
   const checkConnectionStatus = async () => {
     try {
-      const token = localStorage.getItem("token")
-      const response = await axios.get(`/api/connections/status/${userId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const response = await api.get(`/api/connections/status/${userId}`)
       setConnectionStatus(response.data.status)
     } catch (error) {
       console.error("Error checking connection status:", error)
@@ -73,15 +64,8 @@ export default function UserProfileModal({ userId, isOpen, onClose, onStartConve
 
   const sendConnectionRequest = async () => {
     try {
-      const token = localStorage.getItem("token")
       console.log("[UserProfileModal] Sending connection request to userId:", userId, "from currentUserId:", currentUserId)
-      await axios.post(
-        "/api/connections/request",
-        { userId: userId },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      )
+      await api.post("/api/connections/request", { userId: userId })
       setConnectionStatus("pending")
       alert("Connection request sent!")
     } catch (error) {
@@ -92,13 +76,9 @@ export default function UserProfileModal({ userId, isOpen, onClose, onStartConve
 
   const startConversation = async () => {
     try {
-      const token = localStorage.getItem("token")
-      const response = await axios.post(
-        "/api/conversations",
-        { participantId: userId },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
+      const response = await api.post(
+        "/api/messages/conversations",
+        { participantId: userId }
       )
       if (onStartConversation) {
         onStartConversation(response.data)

@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars */
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../utils/api";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -75,7 +75,7 @@ const Index = () => {
 
     if (Object.keys(newErrors).length === 0) {
       try {
-        await axios.post("/api/auth/signup", {
+        await api.post("/api/auth/signup", {
           name: formData.fullName,
           email: formData.email,
           password: formData.password,

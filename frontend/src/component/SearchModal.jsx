@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Search, X, UserPlus, User } from "lucide-react"
-import axios from "axios"
+import api from "../utils/api"
 
 export default function SearchModal({ isOpen, onClose, onUserSelect }) {
   const [searchTerm, setSearchTerm] = useState("")
@@ -32,10 +32,7 @@ export default function SearchModal({ isOpen, onClose, onUserSelect }) {
   const searchUsers = async () => {
     setLoading(true)
     try {
-      const token = localStorage.getItem("token")
-      const response = await axios.get(`/api/users/search?q=${encodeURIComponent(searchTerm)}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const response = await api.get(`/api/users/search?q=${encodeURIComponent(searchTerm)}`)
       setSearchResults(response.data || [])
     } catch (error) {
       console.error("Error searching users:", error)
@@ -59,14 +56,7 @@ export default function SearchModal({ isOpen, onClose, onUserSelect }) {
   const sendConnectionRequest = async (userId, event) => {
     event.stopPropagation()
     try {
-      const token = localStorage.getItem("token")
-      await axios.post(
-        "/api/connection-requests",
-        { targetUserId: userId },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      )
+      await api.post("/api/connections/request", { userId: userId })
       alert("Connection request sent!")
       // Update the user in search results to show request sent
       setSearchResults((prev) => prev.map((user) => (user._id === userId ? { ...user, requestSent: true } : user)))

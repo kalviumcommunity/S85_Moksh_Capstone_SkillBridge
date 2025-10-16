@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 
 const PostList = () => {
   const [posts, setPosts] = useState([]);
 
   useEffect(() => {
-    axios.get('/api/posts').then(res => setPosts(res.data));
+    api.get('/api/posts').then(res => setPosts(res.data));
   }, []);
 
   return (

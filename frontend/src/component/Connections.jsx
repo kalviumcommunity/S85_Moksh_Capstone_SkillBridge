@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react"
 import { X, Search, Users, UserPlus, UserCheck, UserX, MessageCircle } from "lucide-react"
-import axios from "axios"
+import api from "../utils/api"
 
 export default function Connections({ onClose, onOpenMessages }) {
   const [activeTab, setActiveTab] = useState("connections") // connections, requests, discover
@@ -35,10 +35,7 @@ export default function Connections({ onClose, onOpenMessages }) {
 
   const loadConnections = async () => {
     try {
-      const token = localStorage.getItem("token")
-      const response = await axios.get("/api/connections", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const response = await api.get("/api/connections")
       setConnections(response.data || [])
     } catch (error) {
       console.error("Error loading connections:", error)
@@ -49,10 +46,7 @@ export default function Connections({ onClose, onOpenMessages }) {
   // Update loadConnectionRequests
   const loadConnectionRequests = async () => {
     try {
-      const token = localStorage.getItem("token")
-      const response = await axios.get("/api/connections/requests", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const response = await api.get("/api/connections/requests")
       setConnectionRequests(response.data || [])
     } catch (error) {
       console.error("Error loading connection requests:", error)
@@ -62,10 +56,7 @@ export default function Connections({ onClose, onOpenMessages }) {
 
   const loadDiscoverUsers = async () => {
     try {
-      const token = localStorage.getItem("token")
-      const response = await axios.get("/api/connections/suggestions", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const response = await api.get("/api/connections/suggestions")
       setDiscoverUsers(response.data || [])
     } catch (error) {
       console.error("Error loading discover users:", error)
@@ -78,15 +69,8 @@ export default function Connections({ onClose, onOpenMessages }) {
   // Update sendConnectionRequest
   const sendConnectionRequest = async (targetUserId) => {
     try {
-      const token = localStorage.getItem("token")
       console.log("[sendConnectionRequest] Sending userId:", targetUserId)
-      await axios.post(
-        "/api/connections/request",
-        { userId: targetUserId },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      )
+      await api.post("/api/connections/request", { userId: targetUserId })
       loadDiscoverUsers()
     } catch (error) {
       console.error("[sendConnectionRequest] Error:", error)
@@ -96,14 +80,7 @@ export default function Connections({ onClose, onOpenMessages }) {
   // Update acceptConnectionRequest
   const acceptConnectionRequest = async (requestId) => {
     try {
-      const token = localStorage.getItem("token")
-      await axios.put(
-        `/api/connections/${requestId}`,
-        { status: "accepted" }, // <-- FIXED: use status, not action
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      )
+      await api.put(`/api/connections/${requestId}`, { status: "accepted" })
       loadConnectionRequests()
       loadConnections()
     } catch (error) {
@@ -113,14 +90,7 @@ export default function Connections({ onClose, onOpenMessages }) {
 
   const rejectConnectionRequest = async (requestId) => {
     try {
-      const token = localStorage.getItem("token")
-      await axios.put(
-        `/api/connections/${requestId}`,
-        { status: "declined" }, // <-- FIXED: use status, not action
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      )
+      await api.put(`/api/connections/${requestId}`, { status: "declined" })
       loadConnectionRequests()
     } catch (error) {
       console.error("Error rejecting connection request:", error)
@@ -129,12 +99,7 @@ export default function Connections({ onClose, onOpenMessages }) {
 
   const handleMessageClick = async (userId) => {
     try {
-      const token = localStorage.getItem("token")
-      const response = await axios.post(
-        "/api/conversations",
-        { participantId: userId },
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
+      const response = await api.post("/api/messages/conversations", { participantId: userId })
       if (onOpenMessages) {
         onOpenMessages(response.data) // Pass the conversation object!
       }

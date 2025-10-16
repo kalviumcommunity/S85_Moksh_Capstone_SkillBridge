@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../utils/api";
 
 const CompanySignup = () => {
   const [form, setForm] = useState({
@@ -29,7 +29,7 @@ const CompanySignup = () => {
     setError("");
     setLoading(true);
     try {
-      await axios.post("/api/auth/signup", {
+      await api.post("/api/auth/signup", {
         ...form,
         role: "company",
       });

@@ -6,9 +6,9 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Add error logging for debugging
+// Debug logging if env vars are missing
 if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
-  console.error('Missing Cloudinary environment variables:', {
+  console.error('❌ Missing Cloudinary environment variables:', {
     cloud_name: !!process.env.CLOUDINARY_CLOUD_NAME,
     api_key: !!process.env.CLOUDINARY_API_KEY,
     api_secret: !!process.env.CLOUDINARY_API_SECRET
